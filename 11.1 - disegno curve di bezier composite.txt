@@ -1,0 +1,407 @@
+#include <GL/glew.h>
+#include <GL/freeglut.h>
+#include <time.h>
+#define _USE_MATH_DEFINES
+#include <math.h>
+#include <stdio.h>
+
+
+typedef struct NORMAL {
+	float x;
+	float y;
+	float z;
+}NORMAL;
+
+typedef struct VERTEX {
+	float x;
+	float y;
+	float z;
+}VERTEX;
+
+typedef struct FACE {
+	int NVertex;
+	int FaceIndex;
+	int* VertexIndex;
+} FACE;
+
+typedef struct POLYGON {
+	int NVertex;
+	VERTEX * PolygonVertexs;
+	int NNormals;
+	NORMAL * PolygonNormals;
+	int NFaces;
+	FACE * PolygonFaces;
+}POLYGON;
+
+typedef struct POINTOFVIEW {
+	float x = 0;
+	float y = 10;
+	float z = -20;
+}POINTOFVIEW;
+
+typedef struct VISUALVOL {
+	float Xstart = -40;
+	float Xend = 40;
+	float Ystart = -40;
+	float Yend = 40;
+	float Zstart = -30;
+	float Zend = 10;
+	float VisualAngle = 45;
+};
+
+typedef struct RGB {
+	float R = 0.1;
+	float G = 0.1;
+	float B = 0.1;
+	float OPACITY = 1.0;
+};
+
+typedef struct WINDOWSIZE {
+	int HEIGHT = 640;
+	int WIDTH = 640;
+};
+
+typedef struct TIMEROTATION {
+	int ROTATEMINUTES = 45;
+	int ROTATESECONDS = 45;
+};
+typedef struct BUTTON {
+	float xStart = 0;
+	float xEnd = 0;
+	float yStart = 0;
+	float yEnd = 0;
+};
+//functions
+//pulisce e inizializza campo di discegno
+void initBasicDraw();
+//disegna la scena
+void printScene();
+//riporta errori
+void checkError(char *label);
+//cambia il colore di sfondo con un click da pad
+void changeBackgoundColor();
+//disegna un prisma a 8 facce
+void drawGrid(float x, float y, float firstZ, float secondZ);
+// regola le interazioni con la tastiera
+void keyboard(unsigned char key, int x, int y);
+// ritorna la normale del poligono in ingresso
+NORMAL getNormal(VERTEX *polygonVertexs, int * vIndex, int N);
+// ritorna la normale del poligono in ingresso
+FACE setFace(int faceIndex, int nVertex, int *vertexsIndex);
+//inizializza un poligono
+POLYGON initPolygon(int nVertex, int nNormals, int nFaces);
+//calcola la Ydella griglia da disegnare
+float getY(float x, float z);
+//anima la superfice modificando il parametro k
+void animate(int value);
+//valuta la curva di bezier a dun dato t e restituisce un punto della curva
+VERTEX bezierEvaluation(int controlPointsNumber, float t);
+//dizegna una curva di bezier
+void drawBezier();
+//caloclo coord omogenee
+void calcoloCoordOmogenee(int);
+//mouse motion
+void mouse(int button, int state, int x, int y);
+//global variables
+
+
+VERTEX controlPoints[100];
+int indexStart[100] = { 0 };
+int indexEnd[100] = { 4 };
+int curveNumber = 1;
+int controlPointsNumber = 4;
+GLfloat cpw[100][4];
+//weight
+GLfloat w[100] = { 1.0,1.0,1.0,1.0 };
+
+const int START = 0;
+const int STOP = 1;
+const int RESET = 2;
+POINTOFVIEW view;
+TIMEROTATION timer;
+VISUALVOL volumeDiVista;
+WINDOWSIZE window;
+BUTTON stopButton;
+int lancets = STOP;
+int Kparam = 1;
+RGB color;
+double TWO_PI = (2 * M_PI);
+const int Numbers[15] = { '1','2','3','4','5','6','7','8','9','1','0','1','1','1','2' };
+
+
+void main(int argc, char** argv) {
+	srand(time(0));
+	for (int i = 0; i < controlPointsNumber; i++) {
+		controlPoints[i].x = ((float)(rand() % 200) - 100) / 100.0;
+		controlPoints[i].y = ((float)(rand() % 200) - 100) / 100.0;
+		controlPoints[i].z = 0.0;
+	}
+	glutInit(&argc, argv);
+	srand(time(0));
+	glutInitDisplayMode(GLUT_RGB);
+	//glutInitWindowPosition(300, 100);
+	glutInitWindowSize(window.WIDTH, window.HEIGHT);
+	glutCreateWindow(argv[0]);
+	glutDisplayFunc(printScene);
+	glutMouseFunc(mouse);
+	glutKeyboardFunc(keyboard);
+	glutMainLoop();
+}
+
+
+void mouse(int button, int state, int x, int y) {
+	float xx = ((float)x / (window.WIDTH / 2) - 1);
+	float yy = -((float)y / (window.HEIGHT / 2) - 1);
+
+		if (state == GLUT_UP) {
+			controlPointsNumber++;
+			indexEnd[curveNumber - 1]++;
+			w[controlPointsNumber - 1] = 1.0;
+			controlPoints[controlPointsNumber - 1].x = xx;
+			controlPoints[controlPointsNumber - 1].y = yy;
+			controlPoints[controlPointsNumber - 1].z = 0.0;
+			glutPostRedisplay();
+			if (button == GLUT_LEFT_BUTTON) {
+
+			}
+			else if (button == GLUT_MIDDLE_BUTTON) {
+			}
+			else if (button == GLUT_RIGHT_BUTTON) {
+
+			}
+		}
+	
+}
+
+void checkError(char *label) {
+	GLenum error;
+	while ((error = glGetError()) != GL_NO_ERROR) {
+		printf("%s: %s\n", label, gluErrorString(error));
+	}
+}
+
+void initBasicDraw() {
+	changeBackgoundColor();
+	glLoadIdentity();
+	glMatrixMode(GL_MODELVIEW);
+	glPointSize(3.0);
+	glClear(GL_COLOR_BUFFER_BIT);
+}
+
+void keyboard(unsigned char key, int x, int y) {
+
+	switch (key) {
+	case 'd': /* destra */
+		if (view.x < 11) {
+			view.x += 0.1;
+		}
+		break;
+	case 'a'://sinistra
+		if (view.x > -11) {
+			view.x += -0.1;
+		}
+		break;
+	case 'w'://su
+		if (view.y < 11) {
+			view.y += 0.1;
+		}
+		break;
+	case 's': /* giu */
+		if (view.y > -11) {
+			view.y += -0.1;
+		}
+		break;
+	case 'n':
+		curveNumber++;
+		indexStart[curveNumber - 1] = indexEnd[curveNumber - 2] - 1;
+		indexEnd[curveNumber - 1] = indexStart[curveNumber - 1] + 1;
+	}
+
+	glutPostRedisplay();
+}
+
+void animate(int value) {
+	glutTimerFunc(10, animate, 0);
+	Kparam++;
+	glutPostRedisplay();
+}
+void printScene() {
+	initBasicDraw();
+	glClearColor(0, 0, 0, 1);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	glEnable(GL_DEPTH_TEST);
+
+	glMatrixMode(GL_PROJECTION);
+	//glFrustum(-10, 10, -10, 10, 10, 60);
+	//gluPerspective(volumeDiVista.VisualAngle, 1, volumeDiVista.Zstart, volumeDiVista.Zend);
+	glMatrixMode(GL_MODELVIEW);
+	glEnable(GL_NORMALIZE);
+	glEnable(GL_LIGHTING);
+	glEnable(GL_LIGHT0);
+
+	glShadeModel(GL_FLAT);
+
+	glPushMatrix();
+
+	glLoadIdentity();
+
+	glPushMatrix();
+	//glTranslatef(0.2, 0.2, 0.0);
+	//glRotatef(-30, 1, 1, 0);
+	drawBezier();
+	glPopMatrix();
+	glMatrixMode(GL_PROJECTION);
+	glPopMatrix();
+}
+
+
+//cambia il colore di sfondo
+void changeBackgoundColor() {
+	glClearColor(color.R, color.G, color.B, color.OPACITY);
+	glClear(GL_COLOR_BUFFER_BIT);
+}
+
+NORMAL getNormal(VERTEX *polygonVertexs, int * vIndex, int N) {
+	NORMAL myNormal;
+	myNormal.x = 0;
+	myNormal.y = 0;
+	myNormal.z = 0;
+	for (int i = 0; i < N; i++) {
+		myNormal.x += (polygonVertexs[vIndex[i]].y - polygonVertexs[vIndex[(i + 1) % N]].y)*(polygonVertexs[vIndex[i]].z + polygonVertexs[vIndex[(i + 1) % N]].z);
+		myNormal.y += (polygonVertexs[vIndex[i]].z - polygonVertexs[vIndex[(i + 1) % N]].z)*(polygonVertexs[vIndex[i]].x + polygonVertexs[vIndex[(i + 1) % N]].x);
+		myNormal.z += (polygonVertexs[vIndex[i]].x - polygonVertexs[vIndex[(i + 1) % N]].x)*(polygonVertexs[vIndex[i]].y + polygonVertexs[vIndex[(i + 1) % N]].y);
+	}
+	return myNormal;
+}
+
+FACE setFace(int faceIndex, int nVertex, int *vertexsIndex) {
+	FACE myFace;
+	myFace.FaceIndex = faceIndex;
+	myFace.NVertex = nVertex;
+	myFace.VertexIndex = (int *)malloc(nVertex * sizeof(int));
+	for (int i = 0; i< nVertex; i++)
+		myFace.VertexIndex[i] = vertexsIndex[i];
+	return myFace;
+}
+
+POLYGON initPolygon(int nVertex, int nNormals, int nFaces) {
+	POLYGON myPolygon;
+	myPolygon.NVertex = nVertex;
+	myPolygon.NNormals = nNormals;
+	myPolygon.NFaces = nFaces;
+	myPolygon.PolygonVertexs = (VERTEX *)malloc(myPolygon.NVertex * sizeof(VERTEX));
+	myPolygon.PolygonFaces = (FACE *)malloc(myPolygon.NFaces * sizeof(FACE));
+	myPolygon.PolygonNormals = (NORMAL *)calloc(myPolygon.NNormals, sizeof(NORMAL));
+	return myPolygon;
+}
+
+float getY(float x, float z) {
+	return (2 * sin(sqrt((x*x) + (z*z)))) / sqrt((x*x) + (z*z));
+}
+
+float getY2(float x, float z) {
+	return (2 * sin(sqrt((x*x) + (z*z)) - (Kparam * M_PI / 32))) / (sqrt((x*x) + (z*z)) - (Kparam * M_PI / 32));
+}
+
+void calcoloCoordOmogenee(int currentCurve){
+
+	for (int i = indexStart[currentCurve]; i < indexEnd[currentCurve]; i++) {
+		cpw[i - indexStart[currentCurve]][0] = controlPoints[i].x * w[i];
+		cpw[i - indexStart[currentCurve]][1] = controlPoints[i].y * w[i];
+		cpw[i - indexStart[currentCurve]][2] = controlPoints[i].z * w[i];
+		cpw[i - indexStart[currentCurve]][3] = w[i];
+	}
+}
+
+void drawBezier() {
+
+	VERTEX point;
+	float pace = 0.001;
+	float t = 0.1;
+	glClearColor(1, 1, 1, 1);
+
+	float Npassi = (1 - 0) / pace;
+
+
+	for (int i = 0; i < curveNumber; i++) {
+		calcoloCoordOmogenee(i);
+
+		glMap1f(GL_MAP1_VERTEX_4, 0.0, 1, 4, indexEnd[i]-indexStart[i], &cpw[0][0]);
+		glEnable(GL_MAP1_VERTEX_4);
+
+		glMapGrid1f(Npassi, 0, 1);
+		glEvalMesh1(GL_LINE, 0, Npassi);
+	}
+	//disegno punti di controllo
+	glClearColor(1, 1, 0, 1);
+	glPointSize(5.0);
+	for (int i = 0; i < controlPointsNumber; i++) {
+		glBegin(GL_POINTS);
+		glVertex2f(controlPoints[i].x, controlPoints[i].y);
+		glEnd();
+	}
+	glFlush();
+}
+void drawGrid(float x, float y, float firstZ, float secondZ) {
+
+	POLYGON grid;
+	int vertexIndex[4] = { 0,1,2,3 };
+	//int vertexIndex[4] = { 3,2,1,0 };
+	VERTEX polVert[4];
+	NORMAL normal;
+
+
+
+	float pace = 0.3;
+	gluLookAt(view.x, view.y, view.z, x, y, firstZ, 0.0, 1.0, 0.0);
+	//printf("k=%d", Kparam);
+	for (float i = -10; i < 10; i = i + pace) {
+		for (float j = -10; j < 10; j = j + pace) {
+			polVert[0].x = i + pace;
+			polVert[0].y = getY2(i + pace, j + pace);
+			polVert[0].z = j + pace;
+			polVert[1].x = i + pace;
+			polVert[1].y = getY2(i + pace, j);
+			polVert[1].z = j;
+			polVert[2].x = i;
+			polVert[2].y = getY2(i, j);
+			polVert[2].z = j;
+			polVert[3].x = i;
+			polVert[3].y = getY2(i, j + pace);
+			polVert[3].z = j + pace;
+			glBegin(GL_QUADS);
+			normal = getNormal(polVert, vertexIndex, 4);
+			//printf(" %f, %f , %f\n", normal.x, normal.y, normal.z);
+			glNormal3f(normal.x, normal.y, normal.z);
+			glVertex3f(polVert[0].x, polVert[0].y, polVert[0].z);
+			glVertex3f(polVert[1].x, polVert[1].y, polVert[1].z);
+			glVertex3f(polVert[2].x, polVert[2].y, polVert[2].z);
+			glVertex3f(polVert[3].x, polVert[3].y, polVert[3].z);
+			glEnd();
+			/*glBegin(GL_POINTS);
+			glVertex3f(normal.x,normal.y,normal.z);
+			glEnd();
+			*/
+		}
+	}
+
+	//checkError("drawGrid");
+	glFlush();
+
+}
+
+VERTEX bezierEvaluation(int controlPointNumber, float t) {
+	VERTEX *Points;
+	Points = (VERTEX *)malloc(controlPointNumber * sizeof(VERTEX));
+	for (int i = 0; i < controlPointNumber; i++) {
+		Points[i] = controlPoints[i];
+	}
+	for (int i = 1; i < controlPointNumber; i++) {
+		for (int j = 0; j < (controlPointNumber - i); j++) {
+			Points[j].x = ((1 - t) * Points[j].x) + (t * Points[j + 1].x);
+			Points[j].y = ((1 - t) * Points[j].y) + (t * Points[j + 1].y);
+			Points[j].z = ((1 - t) * Points[j].z) + (t * Points[j + 1].z);
+		}
+	}
+	return Points[0];
+}

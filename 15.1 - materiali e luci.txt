@@ -1,0 +1,414 @@
+#include <GL/glew.h>
+#include <GL/freeglut.h>
+#include <time.h>
+#define _USE_MATH_DEFINES
+#include <math.h>
+#include <stdio.h>
+
+void draw();
+
+void drawFunction();
+void drawWall(float x, float y, float z, float endX, float endY, float endZ, float dx, float dy, float dz);
+void light(bool flag, GLenum light, GLfloat pos[3], GLfloat dir[3]);
+void keyboardSpecial(int key, int x, int y);
+void keyboard(unsigned char key, int x, int y);
+void mouseclick(int button, int state, int x, int y);
+//Variabili globali
+
+//Colore sfondo
+float COLORE_SFONDO_R = 0;
+float COLORE_SFONDO_G = 0;
+float COLORE_SFONDO_B = 0;
+
+
+//Dimensione della finestra
+int HEIGHT = 700;
+int WIDTH = 700;
+float grx, gry, grz = 0;
+float ex = 0;
+float ey = 45;
+float tx = 0;
+float ty = 0;
+float startx, starty = 0;
+
+typedef struct TDO {
+	float x;
+	float y;
+	float z;
+}TDO;
+TDO* getQuad(float, float, float);
+
+typedef struct VISUALEYE {
+	float x = 0;
+	float y = 3.5;
+	float z = 1;
+}VISUALEYE;
+
+typedef struct VISUALPOS {
+	float x = 0;
+	float y = 3.5;
+	float z = 0;
+}VISUALPOS;
+
+VISUALPOS observer;
+VISUALEYE eyesObserver;
+bool lb = false;
+bool show = true;
+bool flag1 = false;
+bool flag2 = false;
+bool flag3 = false;
+bool flag4 = false;
+bool flag5 = false;
+
+int main(int argv, char** argc)
+{
+	srand(time(NULL));
+
+	glutInit(&argv, argc);
+
+	glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE | GLUT_DEPTH | GLUT_ALPHA);
+	glutInitWindowPosition(300, 100);
+	glutInitWindowSize(WIDTH, HEIGHT);
+	glutCreateWindow("Esercizio");
+	glutDisplayFunc(draw);
+	glutKeyboardFunc(keyboard);
+	glutSpecialFunc(keyboardSpecial);
+	glutMouseFunc(mouseclick);
+	glutSpecialFunc(keyboardSpecial);
+	glutMainLoop();
+
+
+	return 0;
+
+}
+
+void mouseclick(int button, int state, int x, int y) {
+	startx = ((float)x / (WIDTH / 2) - 1);
+	starty = -((float)y / (HEIGHT / 2) - 1);
+	if (state == GLUT_DOWN) {
+		switch (button) {
+		case GLUT_LEFT_BUTTON:
+			//lb è true se sto schiacciando il tasto sx del mouse
+			if (show)
+				lb = true;
+
+			break;
+		case GLUT_RIGHT_BUTTON:
+			if (show)
+				break;
+		}
+	}
+	if (state == GLUT_UP) {
+		switch (button) {
+		case GLUT_LEFT_BUTTON:
+			lb = false;
+			break;
+		case GLUT_RIGHT_BUTTON:
+
+			break;
+		}
+	}
+
+
+}
+void keyboardSpecial(int key, int x, int y) {
+
+	switch (key) {
+	case GLUT_KEY_UP:
+		gry += 0.5;
+		break;
+	case GLUT_KEY_LEFT:
+		grx -= 0.5;
+		break;
+	case GLUT_KEY_RIGHT:
+		grx += 0.5;
+		break;
+	case GLUT_KEY_DOWN:
+		gry -= 0.5;
+		break;
+	}
+	glutPostRedisplay();
+}
+void keyboard(unsigned char key, int x, int y) {
+	float zStep = 0.1;
+	switch (key) {
+	case '+':
+		grz += 0.5;
+		break;
+	case '-':
+		grz -= 0.5;
+		break;
+	case '1':
+		if (!flag1)
+			flag1 = true;
+		else
+			flag1 = false;
+		break;
+	case '2':
+		if (!flag2)
+			flag2 = true;
+		else
+			flag2 = false;
+		break;
+	case '3':
+		if (!flag3)
+			flag3 = true;
+		else
+			flag3 = false;
+		break;
+	case '4':
+		if (!flag4)
+			flag4 = true;
+		else
+			flag4 = false;
+		break;
+	case '5':
+		if (!flag5)
+			flag5 = true;
+		else
+			flag5 = false;
+		break;
+	case 'w':
+		if (observer.z < 28) {
+			observer.z += zStep;
+			eyesObserver.z += zStep;
+		}
+		break;
+	case's':
+		observer.z -= zStep;
+		eyesObserver.z -= zStep;
+		break;
+	case'a':
+		eyesObserver.x += zStep;
+		break;
+	case 'd':
+		eyesObserver.x -= zStep;
+		break;
+	case'q':
+		eyesObserver.y += zStep;
+		break;
+	case 'z':
+		eyesObserver.y -= zStep;
+		break;
+	}
+	glutPostRedisplay();
+}
+
+
+
+
+void drawWall(float x, float y, float z,float endX,float endY,float endZ, float dx, float dy, float dz) {
+
+	for (float xx = x; xx <= endX; xx = xx + dx) {
+		for (float yy = y; yy <= endY; yy = yy + dy) {
+			for (float zz = z; zz <= endZ; zz = zz + dz) {
+				glPushMatrix();
+				glTranslatef(xx,yy,zz);
+				glutSolidCube(0.1);
+				glPopMatrix();
+	/*			glBegin(GL_POLYGON);
+				glVertex3f(xx, yy, zz);
+				glVertex3f(xx, yy + dy, zz);
+				glVertex3f(xx, yy + dy, zz + dz);
+				glVertex3f(xx, yy, zz + dz);
+				glEnd();
+				
+				glBegin(GL_POLYGON);
+				glVertex3f(xx, yy, zz);
+				glVertex3f(xx, yy + dy, zz);
+				glVertex3f(xx + dx, yy + dy, zz);
+				glVertex3f(xx + dx, yy, zz );
+				glEnd();
+
+				glBegin(GL_POLYGON);
+				glVertex3f(xx, yy, zz);
+				glVertex3f(xx, yy , zz + dz);
+				glVertex3f(xx + dx, yy , zz + dz);
+				glVertex3f(xx + dx, yy, zz);
+				glEnd();
+				*/
+			}
+		}
+	}
+}
+
+void light(bool flag, GLenum light, GLfloat pos[3],GLfloat dir[3]) {
+	GLfloat color3[4] = { 1, 1, 1, 1 };
+	GLfloat reflex3[4] = { 1,1,1,1 };
+	GLfloat attenuation3[3] = { 0.01, 0.01, 0.01 };
+	glLightfv(light, GL_DIFFUSE, color3);
+	glLightfv(light, GL_SPECULAR, reflex3);
+	glLightfv(light, GL_POSITION, pos);
+	glLightfv(light, GL_SPOT_DIRECTION, dir);
+	glLightf(light, GL_SPOT_EXPONENT, 5);
+	glLightfv(light, GL_LINEAR_ATTENUATION, attenuation3);
+	glLighti(light, GL_SPOT_CUTOFF, 60);
+	if (flag)
+		glEnable(light);
+	else
+		glDisable(light);
+
+	GLfloat diffuse5[4] = { 1, 1, 1, 1 };
+	GLfloat ambient5[4] = { 0.4, 0.4, 0.4, 1 };
+	GLfloat emission5[4] = { 0.4, 0.4, 0.4, 1 };
+	GLfloat specular5[4] = { 1, 1 , 1, 1 };
+	glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, diffuse5);
+	glMaterialfv(GL_FRONT_AND_BACK, GL_AMBIENT, ambient5);
+	glMaterialfv(GL_FRONT_AND_BACK, GL_EMISSION, emission5);
+	glMaterialfv(GL_FRONT_AND_BACK, GL_SPECULAR, specular5);
+	glMaterialf(GL_FRONT_AND_BACK, GL_SHININESS, 128);
+	glPushMatrix();
+	glTranslatef(pos[0], pos[1], pos[2]);
+	glRotatef(90, 0, 1, 0);
+	glRotatef(90, 1, 0, 0);
+	glutSolidCone(0.4, 1, 10, 10);
+	//glutSolidSphere(0.4, 100, 100);
+	glPopMatrix();
+}
+
+void drawFunction() {
+	
+	float x = -5;
+	float y = 0;
+	float z = 10;
+	float endX = -4.91;
+	float endY = 5;
+	float endZ = 30;
+	float dx = 0.1;
+	float dy = 0.1;
+	float dz = 0.1;
+
+	//primaluce sotto il tetto
+	GLfloat pos[4] = { 4.6, 3.7, 16, 1 };
+	GLfloat dir[3] = { -0.1, 1, 0 };
+	light(flag1, GL_LIGHT1, pos, dir);
+
+	GLfloat pos1[4] = { -4.6, 3.7, 16, 1 };
+	GLfloat dir1[3] = { 0.1, 1, 0 };
+	light(flag2, GL_LIGHT2,pos1, dir1);
+	
+	GLfloat pos2[4] = { 4.6, 3.7, 22, 1 };
+	GLfloat dir2[3] = { -0.1, 1, 0 };
+	light(flag3, GL_LIGHT3, pos2, dir2);
+
+	GLfloat pos3[4] = { -4.6, 3.7, 22, 1 };
+	GLfloat dir3[3] = { -0.1, 1, 0 };
+	light(flag4, GL_LIGHT4, pos3, dir3);
+	
+
+	//muri laterali
+	GLfloat diffuse[4] = { 0.8, 0.73, 0.5, 1 };
+	GLfloat ambient[4] = { 0.44, 0.36, 0.27, 1 };
+	GLfloat emission[4] = { 0, 0, 0, 1 };
+	GLfloat specular[4] = { 0, 0 , 0, 1 };
+	glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, diffuse);
+	glMaterialfv(GL_FRONT_AND_BACK, GL_AMBIENT, ambient);
+	glMaterialfv(GL_FRONT_AND_BACK, GL_EMISSION, emission);
+	glMaterialfv(GL_FRONT_AND_BACK, GL_SPECULAR, specular);
+	glMaterialf(GL_FRONT_AND_BACK, GL_SHININESS, 0);
+	drawWall(x, y, z, endX, endY-0.1, endZ, dx, dy, dz);
+	drawWall(x + 9.9 , y, z, endX + 9.9, endY-0.1, endZ, dx, dy, dz);
+	
+	//tetto
+	GLfloat diffuse2[4] = { 1, 1, 1, 1 };
+	GLfloat ambient2[4] = { 0.7, 0.7, 0.7, 1 };
+	GLfloat emission2[4] = { 0, 0, 0, 1 };
+	GLfloat specular2[4] = { 0, 0 , 0, 1 };
+	glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, diffuse2);
+	glMaterialfv(GL_FRONT_AND_BACK, GL_AMBIENT, ambient2);
+	glMaterialfv(GL_FRONT_AND_BACK, GL_EMISSION, emission2);
+	glMaterialfv(GL_FRONT_AND_BACK, GL_SPECULAR, specular2);
+	glMaterialf(GL_FRONT_AND_BACK, GL_SHININESS, 0);
+	drawWall(x, y+4.91, z, endX + 9.9, endY, endZ, dx, dy, dz);
+
+	//parete in fondo
+	GLfloat diffuse3[4] = { 0.65, 0.58, 0.35, 1 };
+	GLfloat ambient3[4] = { 0.34, 0.26, 0.17, 1 };
+	GLfloat emission3[4] = { 0, 0, 0, 1 };
+	GLfloat specular3[4] = { 0, 0 , 0, 1 };
+	glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, diffuse3);
+	glMaterialfv(GL_FRONT_AND_BACK, GL_AMBIENT, ambient3);
+	glMaterialfv(GL_FRONT_AND_BACK, GL_EMISSION, emission3);
+	glMaterialfv(GL_FRONT_AND_BACK, GL_SPECULAR, specular3);
+	glMaterialf(GL_FRONT_AND_BACK, GL_SHININESS, 0);
+	drawWall(x, y, endZ-0.1, endX + 9.9, endY, endZ, dx, dy, dz);
+
+	//pavimento
+	GLfloat diffuse4[4] = { 0.32, 0.49, 0.74, 1 };
+	GLfloat ambient4[4] = { 0.18, 0.29, 0.43, 1 };
+	GLfloat emission4[4] = { 0, 0, 0, 1 };
+	GLfloat specular4[4] = { 1, 1 , 1, 1 };
+	glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, diffuse4);
+	glMaterialfv(GL_FRONT_AND_BACK, GL_AMBIENT, ambient4);
+	glMaterialfv(GL_FRONT_AND_BACK, GL_EMISSION, emission4);
+	glMaterialfv(GL_FRONT_AND_BACK, GL_SPECULAR, specular4);
+	glMaterialf(GL_FRONT_AND_BACK, GL_SHININESS, 128);
+	drawWall(x, y, z, endX + 9.9, endY - 4.91, endZ, dx, dy, dz);
+}
+
+void draw() {
+	glClearColor(COLORE_SFONDO_R, COLORE_SFONDO_G, COLORE_SFONDO_B, 1.0);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+	glShadeModel(GL_SMOOTH);
+
+	glEnable(GL_AUTO_NORMAL);
+	//glEnable(GL_NORMALIZE);
+	glEnable(GL_DEPTH_TEST);
+
+	glMatrixMode(GL_PROJECTION);
+	glLoadIdentity();
+	glFrustum(-5, 5, -5, 5, 10, 50);
+	glMatrixMode(GL_MODELVIEW);
+
+	glPushMatrix();
+
+	gluLookAt(observer.x, observer.y, observer.z,//dove mi trovo
+	eyesObserver.x, eyesObserver.y, eyesObserver.z,//dove guardo
+	0.0, 1, 0.0);//dritto rispetto a quale asse
+
+
+	GLfloat ambient[4] = { 0.3, 0.3, 0.3 ,1.0 };
+	glLightModelfv(GL_LIGHT_MODEL_AMBIENT, ambient);
+	glLightModelf(GL_LIGHT_MODEL_TWO_SIDE, 0);
+	glEnable(GL_LIGHTING);
+
+	glPushMatrix();
+	
+
+	GLfloat pos[4] = { 0, 4.8, 18, 1 };
+	GLfloat dir[3] = { 0, -1, 0 };
+	GLfloat color[4] = { 1, 1, 1, 1 };
+	GLfloat reflex[4] = { 1,1,1,1 };
+	GLfloat attenuation[3] = { 0.1, 0.1, 0.1 };
+	glLightfv(GL_LIGHT5, GL_DIFFUSE, color);
+	glLightfv(GL_LIGHT5, GL_SPECULAR, reflex);
+	glLightfv(GL_LIGHT5, GL_POSITION, pos);
+	glLightfv(GL_LIGHT5, GL_SPOT_DIRECTION, dir);
+	glLightf(GL_LIGHT5, GL_SPOT_EXPONENT, 100);
+	glLightfv(GL_LIGHT5, GL_QUADRATIC_ATTENUATION, attenuation);
+	glLighti(GL_LIGHT5, GL_SPOT_CUTOFF, 180);
+	if (flag5)
+		glEnable(GL_LIGHT5);
+	else
+		glDisable(GL_LIGHT5);
+
+	glPushMatrix();
+	glTranslatef(0, 4.4, 18);
+	glRotatef(90, 0, 1, 0);
+	glRotatef(-90, 1, 0, 0);
+	glutSolidCone(2, 1, 10, 10);
+	//glutSolidSphere(0.4, 100, 100);
+	glPopMatrix();
+
+	glPushMatrix();
+	drawFunction();
+	glPopMatrix();
+
+	glPopMatrix();
+
+	glPopMatrix();//RIPRISTINO LO STATO M1 (gluLookAt)
+	glFlush();
+	glDisable(GL_DEPTH_TEST);
+	glutSwapBuffers();//GESTIONE DEL DOPPIO BUFFER
+}

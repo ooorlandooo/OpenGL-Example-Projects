@@ -1,0 +1,472 @@
+#define _USE_MATH_DEFINES
+#define _CRT_SECURE_NO_DEPRECATE
+#include<GL\glew.h>
+#include<GL\freeglut.h>
+#include<stdio.h>
+#include<math.h>
+
+#define PARETE 0
+#define PAVIMENTO 1
+#define TETTO 2
+#define LUCE 3
+////////////////////////////////////////////////////////////////////////
+
+//DATA STRUCTURES
+typedef struct VISUALEYE {
+	float x = 0;
+	float y = 6.5;
+	float z = 18;
+}VISUALEYE;
+
+typedef struct VISUALPOS {
+	float x = 0;
+	float y = 6.5;
+	float z = 17;
+}VISUALPOS;
+////////////////////////////////////////////////////////////////////////////////
+
+//PROTOTYPES
+void Draw();
+void drawWall(int kindOfWall, GLfloat x, GLfloat y, GLfloat z, GLfloat endX, GLfloat endY, GLfloat endZ, GLfloat dx, GLfloat dy, GLfloat dz);
+void light(bool flag, GLenum light, GLfloat pos[3], GLfloat dir[3]);
+void drawFunction();
+
+void keyboard(unsigned char key, int x, int y);
+
+GLfloat * setV4f(GLfloat * a, float x1, float x2, float x3, float x4);
+GLfloat *  setV3f(GLfloat * a, float x1, float x2, float x3);
+unsigned * read_texture(char *name, int *width, int *height, int *components);
+GLvoid initTexture();
+////////////////////////////////////////////////////////////////////////////////
+
+//GLOBAL VARIABLES
+VISUALPOS observer;
+VISUALEYE eyesObserver;
+
+//TURN ON/OFF LIGHTS
+bool flag1 = false;
+bool flag2 = false;
+bool flag3 = false;
+bool flag4 = false;
+bool flag5 = false;
+
+int WINDOW_WIDTH = 700;
+int WINDOW_HEIGHT = 700;
+
+//BACKGROUND COLOR
+GLfloat COLORE_SFONDO_R = 0;
+GLfloat COLORE_SFONDO_G = 0;
+GLfloat COLORE_SFONDO_B = 0;
+
+//LIGHTS AND MATERIALS FEATURES
+GLfloat pos[4] = { 0, 4.8, 18, 1 };
+GLfloat dir[3] = { 0, -1, 0 };
+GLfloat color[4] = { 1, 1, 1, 1 };
+GLfloat reflex[4] = { 1,1,1,1 };
+GLfloat attenuation[3] = { 0.1, 0.1, 0.1 };
+GLfloat diffuse[4] = { 0.1, 0.1, 0.1, 1 };
+GLfloat specular[4] = { 0.8, 0.8, 0.8, 1 };
+GLfloat emission[4] = { 0.1, 0.1, 0.1, 1 };
+GLfloat ambient[4] = { 0.8, 0.8, 0.8, 1 };
+GLfloat ambientColor[4] = { 0.8, 0.8, 0.8, 1 };
+
+
+//TEXTURE
+char *imageFileName = "mattoni.rgba";
+unsigned *imgPareti, *imgPavimento, *imgTetto, *imgLuci;
+GLsizei iwPareti, ihPareti, cPareti;
+GLsizei iwPavimento, ihPavimento, cPavimento;
+GLsizei iwTetto, ihTetto, cTetto;
+GLsizei iwLuci, ihLuci, cLuci;
+static GLfloat xgenparams[] = { 0.3, 0,   0,   0 };
+static GLfloat ygenparams[] = { 0,   0.3, 0,   0 };
+static GLfloat zgenparams[] = { 0,   0,   0.3, 0 };
+GLsizei sWidth = 256, sHeight = 256;
+unsigned *simgPareti, *simgPavimento, *simgTetto,*simgLuci;
+static GLuint texnames[3];
+
+
+int main(int argv, char** argc) {
+	glutInit(&argv, argc);
+	glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE | GLUT_DEPTH | GLUT_ALPHA);
+
+	glutInitWindowPosition(0, 0);
+	glutInitWindowSize(WINDOW_WIDTH, WINDOW_HEIGHT);
+	glutCreateWindow("Project");
+
+	initTexture();
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+	glClearColor(0.0, 0.0, 0.0, 0.0);
+
+	glutKeyboardFunc(keyboard);
+	glutDisplayFunc(Draw);
+	glutMainLoop();
+
+	return 0;
+}
+
+
+//SCENE RENDERING FUNCTIONS
+void light(bool flag, GLenum light, GLfloat pos[3], GLfloat dir[3]) {
+	
+	glLightfv(light, GL_DIFFUSE, setV4f(color, 1, 1, 1, 1));
+	glLightfv(light, GL_SPECULAR, setV4f(reflex, 1, 1, 1, 1));
+	glLightfv(light, GL_POSITION, pos);
+	glLightfv(light, GL_SPOT_DIRECTION, dir);
+	glLightf(light, GL_SPOT_EXPONENT, 2);
+	glLightfv(light, GL_LINEAR_ATTENUATION, setV3f(attenuation, 0.01, 0.01, 0.01));
+	glLighti(light, GL_SPOT_CUTOFF, 90);
+	if (flag)
+		glEnable(light);
+	else
+		glDisable(light);
+
+	glEnable(GL_TEXTURE_2D);
+	glBindTexture(GL_TEXTURE_2D, texnames[LUCE]);
+	glTexGeni(GL_S, GL_TEXTURE_GEN_MODE, GL_OBJECT_LINEAR);
+	glTexGeni(GL_T, GL_TEXTURE_GEN_MODE, GL_OBJECT_LINEAR);
+	glTexGenfv(GL_S, GL_OBJECT_PLANE, xgenparams);
+	glTexGenfv(GL_T, GL_OBJECT_PLANE, zgenparams);
+
+	glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, setV4f(diffuse, 1, 1, 1, 1));
+	glMaterialfv(GL_FRONT_AND_BACK, GL_AMBIENT, setV4f(ambient, 0.43, 0.4, 0.4, 1));
+	glMaterialfv(GL_FRONT_AND_BACK, GL_EMISSION, setV4f(ambient, 0.3, 0.3, 0.3, 1));
+	glMaterialfv(GL_FRONT_AND_BACK, GL_SPECULAR, setV4f(specular, 1, 1, 1, 1));
+	glMaterialf(GL_FRONT_AND_BACK, GL_SHININESS, 128);
+	glPushMatrix();
+	glTranslatef(pos[0], pos[1], pos[2]);
+	glRotatef(90, 0, 1, 0);
+	glRotatef(90, 1, 0, 0);
+	glutSolidCone(0.4, 1, 10, 10);
+	glDisable(GL_TEXTURE_2D);
+	glutSolidSphere(0.07, 100, 100);
+	glPopMatrix();
+}
+
+void drawWall(int kindOfWall, GLfloat x, GLfloat y, GLfloat z, GLfloat endX, GLfloat endY, GLfloat endZ, GLfloat dx, GLfloat dy, GLfloat dz) {
+
+	for (GLfloat xx = x; xx <= endX; xx = xx + dx) {
+		for (GLfloat yy = y; yy <= endY; yy = yy + dy) {
+			for (GLfloat zz = z; zz <= endZ; zz = zz + dz) {
+
+				switch(kindOfWall) {
+				case 0:
+					glBegin(GL_POLYGON);
+					glVertex3f(xx, yy, zz);
+					glVertex3f(xx, yy + dy, zz);
+					glVertex3f(xx, yy + dy, zz + dz);
+					glVertex3f(xx, yy, zz + dz);
+					glEnd();
+					break;
+				case 1:
+					glBegin(GL_POLYGON);
+					glVertex3f(xx, yy, zz);
+					glVertex3f(xx, yy + dy, zz);
+					glVertex3f(xx + dx, yy + dy, zz);
+					glVertex3f(xx + dx, yy, zz);
+					glEnd();
+					break;
+				case 2:
+					glBegin(GL_POLYGON);
+					glVertex3f(xx, yy, zz);
+					glVertex3f(xx, yy, zz + dz);
+					glVertex3f(xx + dx, yy, zz + dz);
+					glVertex3f(xx + dx, yy, zz);
+					glEnd();
+					break;
+
+				}
+
+			}
+		}
+	}
+}
+
+void drawFunction() {
+	int kindOfWall = 0;
+	GLfloat x = -5,
+		y = 0,
+		z = 10,
+		endX = -4.91,
+		endY = 5,
+		endZ = 30,
+		dx = 0.1,
+		dy = 0.1,
+		dz = 0.1;
+
+
+	light(flag1, GL_LIGHT1, setV4f(pos, 4.6, 3.7, 16, 1), setV3f(dir, 0.1, 1, 0.2));
+	light(flag2, GL_LIGHT2, setV4f(pos, -4.6, 3.7, 16, 1), setV3f(dir, 0.1, 1, 0.2));
+	light(flag3, GL_LIGHT3, setV4f(pos, 4.6, 3.7, 22, 1), setV3f(dir, -0.1, 1, 0.2));
+	light(flag4, GL_LIGHT4, setV4f(pos, -4.6, 3.7, 22, 1), setV3f(dir, -0.1, 1, 0.2));
+	
+	glEnable(GL_TEXTURE_2D);
+	glBindTexture(GL_TEXTURE_2D, texnames[PARETE]);
+	glTexGeni(GL_S, GL_TEXTURE_GEN_MODE, GL_OBJECT_LINEAR);
+	glTexGeni(GL_T, GL_TEXTURE_GEN_MODE, GL_OBJECT_LINEAR);
+	glTexGenfv(GL_S, GL_OBJECT_PLANE, zgenparams);
+	glTexGenfv(GL_T, GL_OBJECT_PLANE, ygenparams);
+	//muri laterali
+	glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, setV4f(diffuse, 0.8, 0.9, 0.9, 1));
+	glMaterialfv(GL_FRONT_AND_BACK, GL_AMBIENT, setV4f(ambient, 0.30, 0.4, 0.4, 1));
+	glMaterialfv(GL_FRONT_AND_BACK, GL_EMISSION, setV4f(emission, 0, 0, 0, 1));
+	glMaterialfv(GL_FRONT_AND_BACK, GL_SPECULAR, setV4f(specular, 0, 0, 0, 1));
+	glMaterialf(GL_FRONT_AND_BACK, GL_SHININESS, 0);
+	drawWall(kindOfWall, x, y, z, endX, endY - 0.2, endZ, dx, dy, dz);
+	drawWall(kindOfWall, x + 9.9, y, z, endX + 9.9, endY - 0.2, endZ, dx, dy, dz);
+	
+
+	glBindTexture(GL_TEXTURE_2D, texnames[TETTO]);
+	glTexGeni(GL_S, GL_TEXTURE_GEN_MODE, GL_OBJECT_LINEAR);
+	glTexGeni(GL_T, GL_TEXTURE_GEN_MODE, GL_OBJECT_LINEAR);
+	glTexGenfv(GL_S, GL_OBJECT_PLANE, zgenparams);
+	glTexGenfv(GL_T, GL_OBJECT_PLANE, xgenparams);
+	kindOfWall = 2;
+	//tetto
+	glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, setV4f(diffuse, 1, 1, 1, 1));
+	glMaterialfv(GL_FRONT_AND_BACK, GL_AMBIENT, setV4f(ambient, 0.7, 0.7, 0.7, 1));
+	glMaterialfv(GL_FRONT_AND_BACK, GL_EMISSION, setV4f(emission, 0, 0, 0, 1));
+	glMaterialfv(GL_FRONT_AND_BACK, GL_SPECULAR, setV4f(specular, 0, 0, 0, 1));
+	glMaterialf(GL_FRONT_AND_BACK, GL_SHININESS, 0);
+	drawWall(kindOfWall, x, y + 4.91, z, endX + 9.8, endY, endZ, dx, dy, dz);
+
+	glBindTexture(GL_TEXTURE_2D, texnames[PAVIMENTO]);
+	glTexGeni(GL_S, GL_TEXTURE_GEN_MODE, GL_OBJECT_LINEAR);
+	glTexGeni(GL_T, GL_TEXTURE_GEN_MODE, GL_OBJECT_LINEAR);
+	glTexGenfv(GL_S, GL_OBJECT_PLANE, zgenparams);
+	glTexGenfv(GL_T, GL_OBJECT_PLANE, xgenparams);
+	//pavimento
+	glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, setV4f(diffuse, 0.32, 0.49, 0.6, 1));
+	glMaterialfv(GL_FRONT_AND_BACK, GL_AMBIENT, setV4f(ambient, 0.18, 0.29, 0.37, 1));
+	glMaterialfv(GL_FRONT_AND_BACK, GL_EMISSION, setV4f(emission, 0, 0, 0, 1));
+	glMaterialfv(GL_FRONT_AND_BACK, GL_SPECULAR, setV4f(specular, 1, 1, 1, 1));
+	glMaterialf(GL_FRONT_AND_BACK, GL_SHININESS, 128);
+	drawWall(kindOfWall, x, y, z, endX + 9.8, endY - 4.91, endZ, dx, dy, dz);
+
+	glBindTexture(GL_TEXTURE_2D, texnames[PARETE]);
+	glTexGeni(GL_S, GL_TEXTURE_GEN_MODE, GL_OBJECT_LINEAR);
+	glTexGeni(GL_T, GL_TEXTURE_GEN_MODE, GL_OBJECT_LINEAR);
+	glTexGenfv(GL_S, GL_OBJECT_PLANE, xgenparams);
+	glTexGenfv(GL_T, GL_OBJECT_PLANE, ygenparams);
+	//parete in fondo
+	kindOfWall = 1;
+	glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, setV4f(diffuse, 0.8, 0.9, 0.9, 1));
+	glMaterialfv(GL_FRONT_AND_BACK, GL_AMBIENT, setV4f(ambient, 0.30, 0.4, 0.4, 1));
+	glMaterialfv(GL_FRONT_AND_BACK, GL_EMISSION, setV4f(emission, 0, 0, 0, 1));
+	glMaterialfv(GL_FRONT_AND_BACK, GL_SPECULAR, setV4f(specular, 0, 0, 0, 1));
+	glMaterialf(GL_FRONT_AND_BACK, GL_SHININESS, 0);
+	drawWall(kindOfWall, x, y, endZ - 0.1, endX + 9.9, endY, endZ, dx, dy, dz);
+
+	glDisable(GL_TEXTURE_2D);
+
+}
+
+void Draw() {
+	glClearColor(COLORE_SFONDO_R, COLORE_SFONDO_G, COLORE_SFONDO_B, 1.0);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+	glMatrixMode(GL_PROJECTION);
+	glLoadIdentity();
+	glFrustum(-5, 5, -5, 5, 10, 50);
+	glMatrixMode(GL_MODELVIEW);
+
+	glPushMatrix();
+
+	gluLookAt(observer.x, observer.y, observer.z,//dove mi trovo
+		eyesObserver.x, eyesObserver.y, eyesObserver.z,//dove guardo
+		0.0, 1, 0.0);//dritto rispetto a quale asse
+
+	glEnable(GL_DEPTH_TEST);
+	glShadeModel(GL_SMOOTH);
+	glEnable(GL_AUTO_NORMAL);
+	glEnable(GL_LIGHTING);
+	glEnable(GL_NORMALIZE);
+
+	glEnable(GL_TEXTURE_GEN_S);
+	glEnable(GL_TEXTURE_GEN_T);
+
+	glLightModelfv(GL_LIGHT_MODEL_AMBIENT, ambientColor);
+
+	glPushMatrix();
+		glTranslatef(0, 4.4, 18);
+
+		//SETUP LUCE PRINCIPALE
+		glEnable(GL_TEXTURE_2D);
+		glBindTexture(GL_TEXTURE_2D, texnames[LUCE]);
+		glTexGeni(GL_S, GL_TEXTURE_GEN_MODE, GL_OBJECT_LINEAR);
+		glTexGeni(GL_T, GL_TEXTURE_GEN_MODE, GL_OBJECT_LINEAR);
+		glTexGenfv(GL_S, GL_OBJECT_PLANE, xgenparams);
+		glTexGenfv(GL_T, GL_OBJECT_PLANE, ygenparams);
+
+		glLightfv(GL_LIGHT5, GL_POSITION, setV4f(pos, 0, 4.8, 18, 1));
+		glLightfv(GL_LIGHT5, GL_DIFFUSE, setV4f(color, 1, 1, 1, 1));
+		glLightfv(GL_LIGHT5, GL_AMBIENT, setV4f(ambient, 0.5, 0.5, 0.5, 1));
+		glLightfv(GL_LIGHT5, GL_SPECULAR, setV4f(reflex, 1, 1, 1, 1));
+		glLightfv(GL_LIGHT5, GL_SPOT_DIRECTION, setV3f(dir, 0, -1, 0));
+		glLightfv(GL_LIGHT5, GL_QUADRATIC_ATTENUATION, attenuation);
+		glLightf(GL_LIGHT5, GL_SPOT_CUTOFF, 180);
+		glLightf(GL_LIGHT5, GL_SPOT_EXPONENT, 2);
+		if (flag5)
+			glEnable(GL_LIGHT5);
+		else
+			glDisable(GL_LIGHT5);
+
+		glMaterialfv(GL_FRONT_AND_BACK, GL_DIFFUSE, setV4f(color, 0.8, 0.8, 0.8, 1));
+		glMaterialfv(GL_FRONT_AND_BACK, GL_AMBIENT, setV4f(ambient, 0.5, 0.5, 0.5, 1));
+		glMaterialfv(GL_FRONT_AND_BACK, GL_EMISSION, setV4f(emission, 0.6, 0.6, 0.6, 1));
+		glMaterialfv(GL_FRONT_AND_BACK, GL_SPECULAR, setV4f(reflex, 0.5, 0.5, 0.5, 1));
+		glMaterialf(GL_FRONT_AND_BACK, GL_SHININESS, 128);
+
+		glPushMatrix();
+			glTranslatef(0, 4.5, 18);
+			glRotatef(90, 0, 1, 0);
+			glRotatef(-90, 1, 0, 0);
+			glutSolidCone(1, 0.5, 10, 10);
+			glDisable(GL_TEXTURE_2D);
+			glutSolidSphere(0.3, 100, 100);
+		glPopMatrix();
+
+		glPushMatrix();
+			drawFunction();
+		glPopMatrix();
+	glPopMatrix();
+
+	glPopMatrix();//RIPRISTINO LO STATO M1 (gluLookAt)
+	glFlush();
+
+	glDisable(GL_DEPTH_TEST);
+	glDisable(GL_LIGHT1);
+	glDisable(GL_LIGHT2);
+	glDisable(GL_LIGHT3);
+	glDisable(GL_LIGHT4);
+	glDisable(GL_LIGHT5);
+	glutSwapBuffers();//GESTIONE DEL DOPPIO BUFFER
+}
+
+//KEYBOARD FUNCTIONS
+void keyboard(unsigned char key, int x, int y) {
+		float zStep = 0.1;
+		switch (key) {
+		case '1':
+			if (!flag1)
+				flag1 = true;
+			else
+				flag1 = false;
+			break;
+		case '2':
+			if (!flag2)
+				flag2 = true;
+			else
+				flag2 = false;
+			break;
+		case '3':
+			if (!flag3)
+				flag3 = true;
+			else
+				flag3 = false;
+			break;
+		case '4':
+			if (!flag4)
+				flag4 = true;
+			else
+				flag4 = false;
+			break;
+		case '5':
+			if (!flag5)
+				flag5 = true;
+			else
+				flag5 = false;
+			break;
+		case 'w':
+			if (observer.z < 28) {
+				observer.z += zStep;
+				eyesObserver.z += zStep;
+			}
+			break;
+		case's':
+			observer.z -= zStep;
+			eyesObserver.z -= zStep;
+			break;
+		case'a':
+			eyesObserver.x += zStep;
+			break;
+		case 'd':
+			eyesObserver.x -= zStep;
+			break;
+		case'q':
+			eyesObserver.y += zStep;
+			break;
+		case 'z':
+			eyesObserver.y -= zStep;
+			break;
+		default:
+			break;
+		}
+		glutPostRedisplay();
+	}
+
+//TEXTURE SETTING FUNCTIONS
+GLfloat * setV4f(GLfloat * a, float x1, float x2, float x3, float x4) {
+	a[0] = x1;
+	a[1] = x2;
+	a[2] = x3;
+	a[3] = x4;
+	return a;
+}
+
+GLfloat * setV3f(GLfloat * a, float x1, float x2, float x3) {
+	a[0] = x1;
+	a[1] = x2;
+	a[2] = x3;
+	return a;
+}
+
+GLvoid initTexture() {
+	imageFileName = "mattoni.rgba";
+	imgPareti = read_texture(imageFileName, &iwPareti, &ihPareti, &cPareti);
+	imageFileName = "pavimento.rgba";
+	imgPavimento = read_texture(imageFileName, &iwPavimento, &ihPavimento, &cPavimento);
+	imageFileName = "tetto.rgba";
+	imgTetto = read_texture(imageFileName, &iwTetto, &ihTetto, &cTetto);
+	imageFileName = "applique.rgba";
+	imgLuci = read_texture(imageFileName, &iwLuci, &ihLuci, &cLuci);
+
+	simgPareti = (unsigned*)malloc(sWidth*sHeight * 4 * sizeof(unsigned));
+	simgPavimento = (unsigned*)malloc(sWidth*sHeight * 4 * sizeof(unsigned));
+	simgTetto = (unsigned*)malloc(sWidth*sHeight * 4 * sizeof(unsigned));
+	simgLuci = (unsigned*)malloc(sWidth*sHeight * 4 * sizeof(unsigned));
+
+	gluScaleImage(GL_RGBA, iwPareti, ihPareti, GL_UNSIGNED_BYTE, imgPareti, sWidth, sHeight, GL_UNSIGNED_BYTE, simgPareti);
+	gluScaleImage(GL_RGBA, iwPavimento, ihPavimento, GL_UNSIGNED_BYTE, imgPavimento, sWidth, sHeight, GL_UNSIGNED_BYTE, simgPavimento);
+	gluScaleImage(GL_RGBA, iwTetto, ihTetto, GL_UNSIGNED_BYTE, imgTetto, sWidth, sHeight, GL_UNSIGNED_BYTE, simgTetto);
+	gluScaleImage(GL_RGBA, iwLuci, ihLuci, GL_UNSIGNED_BYTE, imgLuci, sWidth, sHeight, GL_UNSIGNED_BYTE, simgLuci);
+
+
+	glGenTextures(4, texnames);
+
+	glBindTexture(GL_TEXTURE_2D, texnames[PARETE]);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, sWidth, sHeight, 0, GL_RGBA, GL_UNSIGNED_BYTE, simgPareti);
+
+	glBindTexture(GL_TEXTURE_2D, texnames[PAVIMENTO]);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, sWidth, sHeight, 0, GL_RGBA, GL_UNSIGNED_BYTE, simgPavimento);
+
+
+
+	glBindTexture(GL_TEXTURE_2D, texnames[TETTO]);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, sWidth, sHeight, 0, GL_RGBA, GL_UNSIGNED_BYTE, simgTetto);
+
+	glBindTexture(GL_TEXTURE_2D, texnames[LUCE]);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, sWidth, sHeight, 0, GL_RGBA, GL_UNSIGNED_BYTE, simgLuci);
+
+	glEnable(GL_TEXTURE_2D);
+
+}

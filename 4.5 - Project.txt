@@ -1,0 +1,263 @@
+#include <GL/glew.h>
+#include <GL/freeglut.h>
+#include <time.h>
+#define _USE_MATH_DEFINES
+#include <math.h>
+#include <stdio.h>
+
+
+//functions
+//pulisce e inizializza campo di discegno
+void initBasicDraw();
+//disegna la scena
+void printScene();
+//riporta errori
+void checkError(char *label);
+//cambia il colore di sfondo con un click da pad
+void changeBackgoundColor();
+//stampa di un punto
+void printPoint();
+//stampa una stella a 5 punte
+void printStar(float x, float y);
+// regola le interazioni con la tastiera
+void keyboard(unsigned char key,int x, int y);
+//da riferimento cartesiano dello schermo a riferimento cartesiano di openGl
+float fromSysToGlCartesianHeight(float y);
+float fromSysToGlCartesianWidth(float x);
+//traslazione
+void Translate(float x, float y);
+//disegna un prisma a 8 facce
+void drawPrism(float x, float y, float firstZ, float secondZ);
+//global variables
+
+typedef struct VERTEX {
+	float x;
+	float y;
+	float z;
+}VERTEX;
+
+float ROTATE = 0.0;
+float SCALEX = 1.0;
+float SCALEY = 1.0;
+float SCALEZ = 1.0;
+float POSX = 0.0;
+float POSY = 0.0;
+
+int HEIGHT = 640;
+int WIDTH = 640;
+double TWO_PI = (2 * M_PI);
+float R = 0.0;
+float G = 0.0;
+float B = 0.0;
+float OPACITY = 1.0;
+
+void main(int argc, char** argv) {
+	srand(time(0));
+	glutInit(&argc, argv);
+	glutInitDisplayMode(GLUT_RGB);
+	glutInitWindowPosition(300, 100);
+	glutInitWindowSize(HEIGHT, WIDTH);
+	glutCreateWindow(argv[0]);
+	glutDisplayFunc(printScene);
+	glutKeyboardFunc(keyboard);
+	/*glutSpecialFunc(keyboardSpecial);
+	glutMouseFunc(mouse);
+	glutMotionFunc(mousemoving);*/
+	glutMainLoop();
+}
+
+void checkError(char *label){
+	GLenum error;
+	while ((error = glGetError()) != GL_NO_ERROR) {
+		printf("%s: %s\n", label, gluErrorString(error));
+	}
+}
+
+//cambia il colore di sfondo con un click da tastiera
+void changeBackgoundColor() {
+	R = float(rand()) / float(RAND_MAX);
+	G = float(rand()) / float(RAND_MAX);
+	B = float(rand()) / float(RAND_MAX);
+	glClearColor(R, G, B, OPACITY);
+	glClear(GL_COLOR_BUFFER_BIT);
+}
+
+//stampa di un punto
+void printPoint(void) {
+
+changeBackgoundColor();
+glBegin(GL_POINTS);
+glVertex2f(0.0, 0.0);
+glEnd();
+glFlush();
+}
+
+void initBasicDraw() {
+	glLoadIdentity();
+	glTranslatef(POSX, POSY, 0.0); 
+	glRotatef(ROTATE, 0.0, 0.0, 1.0);
+	glScalef(SCALEX, SCALEY, SCALEZ);
+	glPointSize(3.0);
+	glClear(GL_COLOR_BUFFER_BIT);
+}
+
+void keyboard(unsigned char key, int x, int y) {
+
+	switch (key) {
+	case 'c': /* spazio */
+		changeBackgoundColor();
+		break;
+	case 'r'://rotate
+		ROTATE = ROTATE - 1.0;
+		Translate(x, y);
+		glRotatef(-1, 0.0, 0.0, 1.0);
+		printStar(0.0, 0.0);
+		glTranslatef(0.0, 0.0, 0.0);
+		break;
+	case 't'://translate
+		Translate(x, y);
+		printStar(0.0, 0.0);
+		glTranslatef(0.0, 0.0, 0.0);
+		break;
+	case 's'://scale down
+		//if (SCALEX > 0.1) {
+			SCALEX = SCALEX - 0.1;
+			SCALEY = SCALEY - 0.1;
+			SCALEZ = SCALEZ - 0.1;
+		//}
+		Translate(x, y);
+		glScalef(0.9, 0.9, 0.9);
+		glTranslatef(0.0, 0.0, 0.0);
+		break;
+	case 'a'://scale up
+		SCALEX = SCALEX + 0.1;
+		SCALEY = SCALEY + 0.1;
+		SCALEZ = SCALEZ + 0.1;
+
+		Translate(x, y);
+		glScalef(1.1, 1.1, 1.1);
+		glTranslatef(0.0, 0.0, 0.0);
+		break;
+	case 27: /* ESC */
+		exit(0);
+	}
+
+	glutPostRedisplay();
+}
+
+void Translate(float x, float y) {
+	POSX = fromSysToGlCartesianWidth(x);
+	POSY = fromSysToGlCartesianHeight(y);
+	glTranslatef(POSX, POSY, 0.0);
+}
+
+float fromSysToGlCartesianWidth(float x) {
+	return (((x*2.0) / WIDTH) - 1.0);
+}
+float fromSysToGlCartesianHeight(float y) {
+	return (((y*(-2.0)) / HEIGHT) + 1.0);
+}
+// stampa una stella a cinque punte
+void printStar(float x, float y) {
+	float radius = 0.5;
+	float amplitude = radius / 5;
+	glBegin(GL_TRIANGLE_FAN);
+		glColor3f(1.0, 0.8, 0.5);
+		glVertex2f(x,y);
+		float angle = TWO_PI / 10;
+		int count = 0;
+		for (float i = 0; i <= TWO_PI; i = i + angle) {
+			if (count%2 == 0) {
+				glColor3f(0.9, 0.7, 0.0);
+				glVertex2f(cos(i)*amplitude, sin(i)*amplitude);
+			}
+			else {
+				glColor3f(1.0, 0.8, 0.5);
+				glVertex2f(cos(i)*radius, sin(i)*radius);
+			}
+			count++;
+		}
+		glColor3f(0.9, 0.7, 0.0);
+		glVertex2f(1.0*amplitude, 0.0);
+
+	glEnd();
+	checkError("printStar");
+	glFlush();
+}
+
+void printScene() {
+	//changeBackgoundColor();
+	initBasicDraw();
+	//printStar(0.0, 0.0);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	glOrtho(-1, 1, -1, 1, 1, 5);
+	glEnable(GL_DEPTH_TEST);
+	glTranslatef(0.2, 0.2, -3.0);
+	drawPrism(0.0,0.0 ,-0.5, -1.5);
+	glTranslatef(-0.2, -0.2, 3.0);
+}
+
+void drawPrism(float x, float y, float firstZ, float secondZ) {
+	VERTEX firstBuffer[10];
+	VERTEX secondBuffer[10];
+	float radius = 0.5;
+	glBegin(GL_TRIANGLE_FAN);
+	//primo prisma
+	glColor3f(1.0, 0.8, 0.5);
+	glVertex3f(x, y, firstZ);
+	float angle = TWO_PI / 8;
+	int count = 0;
+	
+	for (float i = 0; i <= TWO_PI; i = i + angle) {
+
+		glColor3f(1.0, 0.0, 0.5);
+		glVertex3f(cos(i)*radius, sin(i)*radius, firstZ);
+		firstBuffer[count].x= cos(i)*radius;
+		firstBuffer[count].y = sin(i)*radius;
+		firstBuffer[count].z = firstZ;
+		
+		count++;
+	}
+	glColor3f(0.9, 0.0, 0.0);
+	glVertex3f(1.0, 0.0,firstZ);
+	firstBuffer[count].x = 1.0;
+	firstBuffer[count].y = 0.0;
+	firstBuffer[count].z = firstZ;
+	printf("%d", count);
+	radius = radius + 0.05;
+	//secondo prisma
+	glColor3f(0.0, 0.8, 0.5);
+	glVertex3f(x, y, secondZ);
+
+	count = 0;
+	for (float i = 0; i <= TWO_PI; i = i + angle) {
+
+		glColor3f(0.0, 0.8, 0.5);
+		glVertex3f(cos(i)*radius, sin(i)*radius, secondZ);
+		secondBuffer[count].x = cos(i)*radius;
+		secondBuffer[count].y = sin(i)*radius;
+		secondBuffer[count].z = secondZ;
+		count++;
+	}
+	glColor3f(0.0, 0.7, 0.0);
+	glVertex3f(1.0, 0.0, secondZ);
+	secondBuffer[count].x = 1.0;
+	secondBuffer[count].y = 0.0;
+	secondBuffer[count].z = secondZ;
+	printf("%d", count);
+	glEnd();
+	//glRotatef(90,0,1, 0);
+	glBegin(GL_QUAD_STRIP);
+	for (int i = 0; i < 8; i++) {
+		glVertex3f(secondBuffer[i].x, secondBuffer[i].y, secondBuffer[i].z);
+		glVertex3f(firstBuffer[i].x, firstBuffer[i].y, firstBuffer[i].z);
+
+	}
+	glVertex3f(secondBuffer[0].x, secondBuffer[0].y, secondBuffer[0].z);
+	glVertex3f(firstBuffer[0].x, firstBuffer[0].y, firstBuffer[0].z);
+    glEnd();
+	
+	checkError("drawPrism");
+	glFlush();
+
+}

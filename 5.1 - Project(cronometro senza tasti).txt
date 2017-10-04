@@ -1,0 +1,368 @@
+#include <GL/glew.h>
+#include <GL/freeglut.h>
+#include <time.h>
+#define _USE_MATH_DEFINES
+#include <math.h>
+#include <stdio.h>
+
+//functions
+//pulisce e inizializza campo di discegno
+void initBasicDraw();
+//disegna la scena
+void printScene();
+//riporta errori
+void checkError(char *label);
+//stampa di un punto
+float fromSysToGlCartesianHeight(float y);
+float fromSysToGlCartesianWidth(float x);
+//cambia il colore di sfondo con un click da pad
+void changeBackgoundColor();
+//disegna un prisma a 8 facce
+void drawWatch(float x, float y, float firstZ, float secondZ);
+//functions
+void ruotaLancetta(int value);
+// regola le interazioni con la tastiera
+void keyboard(unsigned char key, int x, int y);
+//regola le interazioni col mouse
+void mouse(int button, int state, int x, int y);
+//global variables
+
+
+typedef struct VERTEX {
+	float x;
+	float y;
+	float z;
+}VERTEX;
+
+typedef struct VISUALVOL {
+	float Xstart = -1;
+	float Xend = 1;
+	float Ystart = -1;
+	float Yend = 1;
+	float Zstart = 1;
+	float Zend = 5;
+	float VisualAngle = 45;
+};
+
+typedef struct RGB {
+	float R = 0.9;
+	float G = 0.9;
+	float B = 0.9;
+	float OPACITY = 1.0;
+};
+
+typedef struct WINDOWSIZE {
+	int HEIGHT = 640;
+	int WIDTH = 640;
+};
+
+typedef struct TIMEROTATION{
+	int ROTATEMINUTES = 45;
+	int ROTATESECONDS = 45;
+};
+typedef struct BUTTON {
+	float xStart = 0;
+	float xEnd = 0;
+	float yStart = 0;
+	float yEnd = 0;
+};
+const int START = 0;
+const int STOP = 1;
+const int RESET = 2;
+TIMEROTATION timer;
+VISUALVOL volumeDiVista;
+WINDOWSIZE window;
+BUTTON stopButton;
+int lancets = STOP;
+RGB color;
+double TWO_PI = (2 * M_PI);
+const int Numbers[15] = { '1','2','3','4','5','6','7','8','9','1','0','1','1','1','2' };
+
+
+void main(int argc, char** argv) {
+	srand(time(0));
+	glutInit(&argc, argv);
+	glutInitDisplayMode(GLUT_RGB);
+	glutInitWindowPosition(300, 100);
+	glutTimerFunc(1000, ruotaLancetta, lancets);
+	glutInitWindowSize(window.HEIGHT, window.WIDTH);
+	glutCreateWindow(argv[0]);
+	glutDisplayFunc(printScene);
+	glutKeyboardFunc(keyboard);
+	glutMouseFunc(mouse);
+	glutMainLoop();
+}
+
+void checkError(char *label) {
+	GLenum error;
+	while ((error = glGetError()) != GL_NO_ERROR) {
+		printf("%s: %s\n", label, gluErrorString(error));
+	}
+}
+
+void initBasicDraw() {
+	changeBackgoundColor();
+	glLoadIdentity();
+	glMatrixMode(GL_MODELVIEW);
+	glPointSize(3.0);
+	glClear(GL_COLOR_BUFFER_BIT);
+}
+
+float fromSysToGlCartesianWidth(float x) {
+	//printf("x...%f window.WIDTH %d result %f", x, window.WIDTH, (((x*2.0) / window.WIDTH) - 1.0));
+	//return (((x*2.0) / window.WIDTH) - 1.0);
+	return (x / (window.WIDTH / 2) - 1);
+}
+float fromSysToGlCartesianHeight(float y) {
+	//return (((y*(-2.0)) / window.HEIGHT) + 1.0);
+	return -(y / (window.HEIGHT / 2) - 1);
+}
+
+float fromGlToSysCartesianWidth(float x) {
+	return (((x + 1)* window.WIDTH)/(1*2) ) ;
+}
+float fromGlToSysCartesianHeight(float y) {
+	return (((y - 1)* window.HEIGHT)/(1*-2)) ;
+}
+
+void mouse(int button, int state, int x, int y) {
+	float xx = fromSysToGlCartesianWidth(float(x));
+	float yy = fromSysToGlCartesianHeight(float(y));
+	printf("button: \nstartx %f, endx %f, starty %f, endy %f\n x %f, y %f\n", stopButton.xStart, stopButton.xEnd, stopButton.yStart, stopButton.yEnd, xx, yy);
+	if (xx >= stopButton.xStart && xx <= stopButton.xEnd && yy >= stopButton.yStart && yy <= stopButton.yEnd) {
+		if (state == GLUT_UP) {
+			if (button == GLUT_LEFT_BUTTON) {
+				if (lancets != START) {
+					lancets = START;
+				}
+			}
+			else if (button == GLUT_MIDDLE_BUTTON) {
+				lancets = STOP;
+			}
+			else if (button == GLUT_RIGHT_BUTTON) {
+				lancets = RESET;
+			}
+		}
+	}
+}
+void keyboard(unsigned char key, int x, int y) {
+
+	switch (key) {
+	case 'c': /* start */
+		if (lancets != START) {
+			lancets = START;
+		}
+		break;
+	case 'r'://stop
+		lancets = STOP;
+
+		break;
+	case 'd'://reset
+		lancets = RESET;
+		break;
+	case 27: /* ESC */
+		exit(0);
+	}
+
+	glutPostRedisplay();
+}
+
+void printScene() {
+	initBasicDraw();
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	//glFrustum(Xstart, Xend, Ystart, Yend, Zstart, Zend);
+	glMatrixMode(GL_PROJECTION);
+	gluPerspective(volumeDiVista.VisualAngle, 1, volumeDiVista.Zstart, volumeDiVista.Zend);
+	glEnable(GL_DEPTH_TEST);
+	glTranslatef(0.0, 0.0, -3.0);
+	glPushMatrix();
+		glMatrixMode(GL_MODELVIEW);
+		glLoadIdentity();
+		glTranslatef(0.2, 0.2, 0.0);
+		glRotatef(-30, 1, 1, 0);
+		glPushMatrix();
+			drawWatch(0.0, 0.0, 0.0, -0.2);
+		glPopMatrix();
+	glMatrixMode(GL_PROJECTION);
+	glPopMatrix();
+}
+
+void ruotaLancetta(int value) {
+
+	glutTimerFunc(1000, ruotaLancetta, lancets);
+	if (lancets == START) {
+		timer.ROTATESECONDS = timer.ROTATESECONDS - 6;
+		if (timer.ROTATESECONDS == -315) {
+			timer.ROTATESECONDS = 45;
+			timer.ROTATEMINUTES = timer.ROTATEMINUTES - 6;
+			if (timer.ROTATEMINUTES == -315) {
+				timer.ROTATEMINUTES = 45;
+			}
+		}
+	}
+	else if (lancets == STOP) {
+		//ignora
+	}
+	else if (value == RESET) {
+		timer.ROTATEMINUTES = 45;
+		timer.ROTATESECONDS = 45;
+		lancets = STOP;
+	}
+	glutPostRedisplay();
+}
+//cambia il colore di sfondo
+void changeBackgoundColor() {
+	glClearColor(color.R, color.G, color.B, color.OPACITY);
+	glClear(GL_COLOR_BUFFER_BIT);
+}
+
+void drawWatch(float x, float y, float firstZ, float secondZ) {
+	const  int angleFraction = 61;
+	const  int numbersFraction = 12;
+	VERTEX firstBuffer[angleFraction];
+	VERTEX secondBuffer[angleFraction];
+	float radius = 0.5;
+	float angle = TWO_PI / (angleFraction - 1);
+	float numbersAngle = TWO_PI / numbersFraction;
+	
+		glBegin(GL_TRIANGLE_FAN);
+		//primo prisma
+		glColor3f(0.9, 0.9, 0.9);
+		glVertex3f(x, y, firstZ);
+		int count = 0;
+
+		for (float i = 0; i <= TWO_PI; i = i + angle) {
+
+			glColor3f(0.05, 0.05, 0.05);
+			glVertex3f(cos(i)*radius, sin(i)*radius, firstZ);
+			
+			firstBuffer[count].x = cos(i)*radius;
+			firstBuffer[count].y = sin(i)*radius;
+			firstBuffer[count].z = firstZ;
+			count++;
+		}
+
+		glEnd();
+	//secondo prisma
+		glBegin(GL_TRIANGLE_FAN);
+		glColor3f(0.2, 0.2, 0.2);
+		glVertex3f(x, y, secondZ);
+
+		count = 0;
+		for (float i = 0; i <= TWO_PI; i = i + angle) {
+
+			glColor3f(0.4, 0.4, 0.4);
+			glVertex3f(cos(i)*radius, sin(i)*radius, secondZ);
+			secondBuffer[count].x = cos(i)*radius;
+			secondBuffer[count].y = sin(i)*radius;
+			secondBuffer[count].z = secondZ;
+			count++;
+		}
+		glEnd();
+
+
+		//copertura laterale
+		glColor3f(0.15, 0.15, 0.15);
+		glBegin(GL_QUAD_STRIP);
+		for (int i = 0; i < (angleFraction-1); i++) {
+			glVertex3f(secondBuffer[i].x, secondBuffer[i].y, secondBuffer[i].z);
+			glVertex3f(firstBuffer[i].x, firstBuffer[i].y, firstBuffer[i].z);
+
+		}
+		glVertex3f(secondBuffer[0].x, secondBuffer[0].y, secondBuffer[0].z);
+		glVertex3f(firstBuffer[0].x, firstBuffer[0].y, firstBuffer[0].z);
+		glEnd();
+
+		//trattini nel quadrante
+		glBegin(GL_POINTS);
+		count = 0;
+		for (float i = 0; i <= TWO_PI; i = i + angle) {
+
+			glColor3f(0.0, 0.0, 0.0);
+			glVertex3f((cos(i)*(radius-0.06)), (sin(i)*(radius-0.06)), firstZ + 0.01);
+			count++;
+		}
+		glEnd();
+		//numeri nel quadrante
+		glColor3f(0.0, 0.0, 0.0);
+		count = 0;
+		for (float i = -45; i <= (TWO_PI-45); i = i + numbersAngle) {
+			if (count <= 8) {
+				glColor3f(0.05, 0.05, 0.05);
+				glPushMatrix();
+					glTranslatef((cos(i)*(radius - 0.1)), -sin(i)*(radius - 0.1), firstZ );
+					glRasterPos3f(-0.01, -0.02, 0.01);
+					glutBitmapCharacter(GLUT_BITMAP_8_BY_13, Numbers[count]);
+				glPopMatrix();
+
+			}
+			else if (count > 8) {
+				glColor3f(0.05, 0.05, 0.05);
+				glPushMatrix();
+					glTranslatef(cos(i)*(radius - 0.1) , -sin(i)*(radius - 0.1), firstZ );
+					glRasterPos3f(-0.03, -0.02, 0.01);
+					glutBitmapCharacter(GLUT_BITMAP_8_BY_13, Numbers[count]);
+					count++;
+					glRasterPos3f(-0.01,-0.02,0.01);
+					glutBitmapCharacter(GLUT_BITMAP_8_BY_13, Numbers[count]);
+				glPopMatrix();
+			}
+			count++;
+			
+		}
+
+		//lancette
+			//lancetta secondi
+		glColor3f(0.5, 0.5, 0.5);
+		glPointSize(5.0);
+		glPushMatrix();
+			glRotatef(timer.ROTATESECONDS, 0.0, 0.0, 1.0);
+			glBegin(GL_LINES);
+			glVertex3f(x, y, firstZ+0.001);
+			glVertex3f(radius - 0.2, radius - 0.2,firstZ+0.001);
+			glEnd();
+		glPopMatrix();
+			//lancetta minuti
+		glColor3f(0.0, 0.0, 0.0);
+		glPointSize(5.0);
+		glPushMatrix();
+			glRotatef(timer.ROTATEMINUTES, 0.0, 0.0, 1.0);
+			glBegin(GL_LINES);
+			glVertex3f(x, y, firstZ + 0.001);
+			glVertex3f(radius - 0.2, radius - 0.2, firstZ + 0.001);
+			glEnd();
+		glPopMatrix();
+		//cover
+		glColor3f(0.25, 0.25, 0.25);
+		glBegin(GL_QUAD_STRIP);
+		glVertex3f(x - (radius + 0.1), y + (radius + 0.1), firstZ - 0.05);
+		glVertex3f(x + (radius + 0.1), y + (radius + 0.1), firstZ - 0.05);
+		glVertex3f(x - (radius + 0.1), y - (radius + 0.3), firstZ - 0.05);
+		glVertex3f(x + (radius + 0.1), y - (radius + 0.3), firstZ - 0.05);
+		glColor3f(0.0, 0.0, 0.0);
+		glVertex3f(x - (radius + 0.1), y - (radius + 0.3), secondZ - 0.05);
+		glVertex3f(x + (radius + 0.1), y - (radius + 0.3), secondZ - 0.05);
+		glVertex3f(x - (radius + 0.1), y + (radius + 0.1), secondZ - 0.05);
+		glVertex3f(x + (radius + 0.1), y + (radius + 0.1), secondZ - 0.05);
+		glVertex3f(x - (radius + 0.1), y + (radius + 0.1), firstZ - 0.05);
+		glVertex3f(x + (radius + 0.1), y + (radius + 0.1), firstZ - 0.05);
+		glEnd();
+		//button
+		glPushMatrix();
+		    glTranslatef(x - (radius/2), y - (radius + 0.1), firstZ + 0.1);
+			stopButton.xStart =  (x - (radius / 2))-0.1;
+		    stopButton.xEnd = (x - (radius / 2)) + 0.1;
+			stopButton.yStart = (y - (radius +0.1)) - 0.05;
+			stopButton.yEnd = y - (radius + 0.1)+0.05;
+			glColor3f(1, 0.25, 0.25);
+			glBegin(GL_QUAD_STRIP);
+			glVertex3f(-0.1, - 0.05, 0.0);
+			glVertex3f(0.1 , -0.05 , 0.0);
+			glVertex3f( -0.1, 0.05, 0.0);
+			glVertex3f(0.1, 0.05, 0.0);
+			glEnd();
+		glPopMatrix();
+	checkError("drawWatch");
+	glFlush();
+
+}

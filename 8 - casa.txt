@@ -1,0 +1,319 @@
+#include <GL/glew.h>
+#include <GL/freeglut.h>
+#include <time.h>
+#define _USE_MATH_DEFINES
+#include <math.h>
+#include <stdio.h>
+
+
+typedef struct NORMAL {
+	float x;
+	float y;
+	float z;
+}NORMAL;
+
+typedef struct VERTEX {
+	float x;
+	float y;
+	float z;
+}VERTEX;
+
+typedef struct FACE {
+	int NVertex;
+	int FaceIndex;
+	int* VertexIndex;
+} FACE;
+
+typedef struct POLYGON {
+	int NVertex;
+	VERTEX * PolygonVertexs;
+	int NNormals;
+	NORMAL * PolygonNormals;
+	int NFaces;
+	FACE * PolygonFaces;
+}POLYGON;
+
+typedef struct POINTOFVIEW{
+	float x = 0;
+	float y = 0;
+	float z = 0.1;
+}POINTOFVIEW;
+
+typedef struct VISUALVOL {
+	float Xstart = -1;
+	float Xend = 1;
+	float Ystart = -1;
+	float Yend = 1;
+	float Zstart = 1;
+	float Zend = 5;
+	float VisualAngle = 45;
+};
+
+typedef struct RGB {
+	float R = 0.1;
+	float G = 0.1;
+	float B = 0.1;
+	float OPACITY = 1.0;
+};
+
+typedef struct WINDOWSIZE {
+	int HEIGHT = 640;
+	int WIDTH = 640;
+};
+
+typedef struct TIMEROTATION {
+	int ROTATEMINUTES = 45;
+	int ROTATESECONDS = 45;
+};
+typedef struct BUTTON {
+	float xStart = 0;
+	float xEnd = 0;
+	float yStart = 0;
+	float yEnd = 0;
+};
+//functions
+//pulisce e inizializza campo di discegno
+void initBasicDraw();
+//disegna la scena
+void printScene();
+//riporta errori
+void checkError(char *label);
+//cambia il colore di sfondo con un click da pad
+void changeBackgoundColor();
+//disegna un prisma a 8 facce
+void drawHouse(float x, float y, float firstZ, float secondZ);
+// regola le interazioni con la tastiera
+void keyboard(unsigned char key, int x, int y);
+// ritorna la normale del poligono in ingresso
+NORMAL getNormal(VERTEX *polygonVertexs, int * vIndex, int N);
+// ritorna la normale del poligono in ingresso
+FACE setFace(int faceIndex, int nVertex, int *vertexsIndex);
+//inizializza un poligono
+POLYGON initPolygon(int nVertex, int nNormals, int nFaces);
+//global variables
+
+
+const int START = 0;
+const int STOP = 1;
+const int RESET = 2;
+POINTOFVIEW view;
+TIMEROTATION timer;
+VISUALVOL volumeDiVista;
+WINDOWSIZE window;
+BUTTON stopButton;
+int lancets = STOP;
+RGB color;
+double TWO_PI = (2 * M_PI);
+const int Numbers[15] = { '1','2','3','4','5','6','7','8','9','1','0','1','1','1','2' };
+
+
+void main(int argc, char** argv) {
+	srand(time(0));
+	glutInit(&argc, argv);
+	glutInitDisplayMode(GLUT_RGB);
+	glutInitWindowPosition(300, 100);
+	glutInitWindowSize(window.HEIGHT, window.WIDTH);
+	glutCreateWindow(argv[0]);
+	glutDisplayFunc(printScene);
+	glutKeyboardFunc(keyboard);
+	glutMainLoop();
+}
+
+void checkError(char *label) {
+	GLenum error;
+	while ((error = glGetError()) != GL_NO_ERROR) {
+		printf("%s: %s\n", label, gluErrorString(error));
+	}
+}
+
+void initBasicDraw() {
+	changeBackgoundColor();
+	glLoadIdentity();
+	glMatrixMode(GL_MODELVIEW);
+	glPointSize(3.0);
+	glClear(GL_COLOR_BUFFER_BIT);
+}
+
+void keyboard(unsigned char key, int x, int y) {
+
+	switch (key) {
+	case 'd': /* destra */
+		if (view.x < 0.6 ) {
+			view.x += 0.05;
+		}
+		break;
+	case 'a'://sinistra
+		if (view.x > -0.6) {
+			view.x += -0.05;
+		}
+		break;
+	case 'w'://su
+		if (view.y < 0.6) {
+			view.y += 0.05;
+		}
+		break;
+	case 's': /* giu */
+		if (view.y > -0.6) {
+			view.y += -0.05;
+		}
+	}
+
+	glutPostRedisplay();
+}
+
+void printScene() {
+	initBasicDraw();
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	//glFrustum(Xstart, Xend, Ystart, Yend, Zstart, Zend);
+	glMatrixMode(GL_PROJECTION);
+	gluPerspective(volumeDiVista.VisualAngle, 1, volumeDiVista.Zstart, volumeDiVista.Zend);
+	glEnable(GL_DEPTH_TEST);
+	glEnable(GL_LIGHTING);
+	glEnable(GL_LIGHT0);
+	glShadeModel(GL_FLAT);
+	glTranslatef(0.0, 0.0, -3.0);
+	glPushMatrix();
+		glMatrixMode(GL_MODELVIEW);
+		glLoadIdentity();
+
+		glPushMatrix();
+			//glTranslatef(0.2, 0.2, 0.0);
+			//glRotatef(-30, 1, 1, 0);
+			drawHouse(0.0, 0.0, 0.0, -0.2);
+		glPopMatrix();
+	glMatrixMode(GL_PROJECTION);
+	glPopMatrix();
+}
+
+
+//cambia il colore di sfondo
+void changeBackgoundColor() {
+	glClearColor(color.R, color.G, color.B, color.OPACITY);
+	glClear(GL_COLOR_BUFFER_BIT);
+}
+
+NORMAL getNormal(VERTEX *polygonVertexs, int * vIndex, int N){
+	NORMAL myNormal;
+	myNormal.x = 0;
+	myNormal.y = 0;
+	myNormal.z = 0;
+	for (int i = 0; i < N; i++) {
+		myNormal.x += (polygonVertexs[vIndex[i]].y - polygonVertexs[vIndex[(i + 1) % N]].y)*(polygonVertexs[vIndex[i]].z + polygonVertexs[vIndex[(i + 1) % N]].z);
+		myNormal.y += (polygonVertexs[vIndex[i]].z - polygonVertexs[vIndex[(i + 1) % N]].z)*(polygonVertexs[vIndex[i]].x + polygonVertexs[vIndex[(i + 1) % N]].x);
+		myNormal.z += (polygonVertexs[vIndex[i]].x - polygonVertexs[vIndex[(i + 1) % N]].x)*(polygonVertexs[vIndex[i]].y + polygonVertexs[vIndex[(i + 1) % N]].y);
+	}
+	return myNormal;
+}
+
+FACE setFace(int faceIndex , int nVertex, int *vertexsIndex) {
+	FACE myFace;
+	myFace.FaceIndex = faceIndex;
+	myFace.NVertex = nVertex;
+	myFace.VertexIndex = (int *)malloc(nVertex * sizeof(int));
+	for(int i = 0; i< nVertex;i++)
+		myFace.VertexIndex[i] = vertexsIndex[i];
+	return myFace;
+}
+
+POLYGON initPolygon(int nVertex, int nNormals, int nFaces){
+	POLYGON myPolygon;
+	myPolygon.NVertex = nVertex;
+	myPolygon.NNormals = nNormals;
+	myPolygon.NFaces = nFaces;
+	myPolygon.PolygonVertexs = (VERTEX *)malloc(myPolygon.NVertex * sizeof(VERTEX));
+	myPolygon.PolygonFaces = (FACE *)malloc(myPolygon.NFaces * sizeof(FACE));
+	myPolygon.PolygonNormals = (NORMAL *)calloc(myPolygon.NNormals, sizeof(NORMAL));
+	return myPolygon;
+}
+void drawHouse(float x, float y, float firstZ, float secondZ) {
+	float lato = 0.2;
+	POLYGON myHome;
+	int vertexIndex[4] = { 0,1,2,3 };
+	myHome = initPolygon(10, 9, 9);
+	myHome.PolygonFaces[0] = setFace(0, 4, vertexIndex);
+	vertexIndex[0] = 3;
+	vertexIndex[1] = 2; 
+	vertexIndex[2] = 4;
+	vertexIndex[3] = 5;
+	myHome.PolygonFaces[1] = setFace(1, 4, vertexIndex);
+	vertexIndex[0] = 7;
+	vertexIndex[1] = 6;
+	vertexIndex[2] = 5;
+	vertexIndex[3] = 4;
+	myHome.PolygonFaces[2] = setFace(2, 4, vertexIndex);
+	vertexIndex[0] = 6;
+	vertexIndex[1] = 0;
+	vertexIndex[2] = 3;
+	vertexIndex[3] = 5;
+	myHome.PolygonFaces[3] = setFace(3, 4, vertexIndex);
+	vertexIndex[0] = 1;
+	vertexIndex[1] = 7;
+	vertexIndex[2] = 4;
+	vertexIndex[3] = 2;
+	myHome.PolygonFaces[4] = setFace(4, 4, vertexIndex);
+	vertexIndex[0] = 8;
+	vertexIndex[1] = 9;
+	vertexIndex[2] = 1;
+	vertexIndex[3] = 0;
+	myHome.PolygonFaces[5] = setFace(5, 4, vertexIndex);
+	vertexIndex[0] = 9;
+	vertexIndex[1] = 8;
+	vertexIndex[2] = 6;
+	vertexIndex[3] = 7;
+	myHome.PolygonFaces[6] = setFace(6, 4, vertexIndex);
+	vertexIndex[0] = 8;
+	vertexIndex[1] = 0;
+	vertexIndex[2] = 6;
+	vertexIndex[3] = -1;
+	myHome.PolygonFaces[7] = setFace(7, 3, vertexIndex);
+	vertexIndex[0] = 9;
+	vertexIndex[1] = 7;
+	vertexIndex[2] = 1;
+	vertexIndex[3] = -1;
+	myHome.PolygonFaces[8] = setFace(8, 3, vertexIndex);
+
+	
+	for(int i = 0; i < myHome.NVertex; i++) {
+		
+		if (i == 0 || i == 3 || i == 6 || i == 5 || i == 8)
+			myHome.PolygonVertexs[i].x = lato;
+		else
+			myHome.PolygonVertexs[i].x = -lato;
+		
+		if (i == 2 || i==3 || i==4 || i==5)
+			myHome.PolygonVertexs[i].y = -lato / 2;
+		else if ( i== 0 || i==1 || i==6 || i==7)
+			myHome.PolygonVertexs[i].y = lato / 2;
+		else
+			myHome.PolygonVertexs[i].y = lato;
+
+		if(i== 0 || i==1 || i== 2 || i == 3)
+			myHome.PolygonVertexs[i].z = firstZ;
+		else if( i==6 || i==7 || i==4 || i==5)
+			myHome.PolygonVertexs[i].z = secondZ;
+		else 
+			myHome.PolygonVertexs[i].z = (secondZ + firstZ)/2;
+	}
+	glPushMatrix();
+	gluLookAt(view.x, view.y, view.z, x, y, firstZ, 0.0, 1.0, 0.0);
+		for (int j = 0; j < myHome.NFaces; j++) {
+			glBegin(GL_POLYGON);
+			myHome.PolygonNormals[j] = getNormal(myHome.PolygonVertexs, myHome.PolygonFaces[j].VertexIndex, myHome.PolygonFaces[j].NVertex);
+			glNormal3f(myHome.PolygonNormals[j].x, myHome.PolygonNormals[j].y, myHome.PolygonNormals[j].z);
+			glColor3f(0.0, 0.0, 0.2*(j+1));
+			for (int i = 0; i < myHome.PolygonFaces[j].NVertex; i++) {
+				glVertex3f(myHome.PolygonVertexs[myHome.PolygonFaces[j].VertexIndex[i]].x, myHome.PolygonVertexs[myHome.PolygonFaces[j].VertexIndex[i]].y, myHome.PolygonVertexs[myHome.PolygonFaces[j].VertexIndex[i]].z);
+			}
+			glEnd();
+			
+			glBegin(GL_POINTS);
+			glColor3f(1, 0.5, 0.5);
+			glVertex3f(myHome.PolygonNormals[j].x, myHome.PolygonNormals[j].y, myHome.PolygonNormals[j].z);
+			glEnd();
+		}
+	glPopMatrix();
+	checkError("drawHouse");
+	glFlush();
+
+}
+
